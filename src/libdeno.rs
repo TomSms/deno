@@ -109,10 +109,17 @@ type DenoRecvCb = unsafe extern "C" fn(
   data_buf: deno_buf,
 );
 
+type ResolveCb = unsafe extern "C" fn(
+  user_data: *mut c_void,
+  specifier: *const c_char,
+  referrer: *const c_char,
+);
+
 #[repr(C)]
 pub struct deno_config {
   pub shared: deno_buf,
   pub recv_cb: DenoRecvCb,
+  pub resolve_cb: ResolveCb,
 }
 
 extern "C" {
@@ -123,6 +130,11 @@ extern "C" {
   pub fn deno_delete(i: *const isolate);
   pub fn deno_last_exception(i: *const isolate) -> *const c_char;
   pub fn deno_check_promise_errors(i: *const isolate);
+  pub fn deno_resolve_ok(
+    i: *const isolate,
+    filename: *const c_char,
+    source: *const c_char,
+  );
   pub fn deno_respond(
     i: *const isolate,
     user_data: *const c_void,

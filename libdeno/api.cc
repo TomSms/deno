@@ -73,6 +73,11 @@ deno::DenoIsolate* unwrap(Deno* d_) {
 deno_buf deno_get_snapshot(Deno* d_) {
   auto* d = unwrap(d_);
   CHECK_NE(d->snapshot_creator_, nullptr);
+
+  // Clear the module map. Work around error
+  // global handle not serialized: 0x26238e79c049 <Module>
+  d->ClearModules();
+
   auto blob = d->snapshot_creator_->CreateBlob(
       v8::SnapshotCreator::FunctionCodeHandling::kClear);
   return {nullptr, 0, reinterpret_cast<uint8_t*>(const_cast<char*>(blob.data)),
@@ -182,5 +187,10 @@ void deno_delete(Deno* d_) {
 void deno_terminate_execution(Deno* d_) {
   deno::DenoIsolate* d = reinterpret_cast<deno::DenoIsolate*>(d_);
   d->isolate_->TerminateExecution();
+}
+
+void deno_resolve_ok(Deno* d_, const char* filename, const char* source) {
+  deno::DenoIsolate* d = reinterpret_cast<deno::DenoIsolate*>(d_);
+  d->ResolveOk(filename, source);
 }
 }

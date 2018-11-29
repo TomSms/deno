@@ -20,6 +20,7 @@ class DenoIsolate {
         snapshot_creator_(nullptr),
         global_import_buf_ptr_(nullptr),
         recv_cb_(config.recv_cb),
+        resolve_cb_(config.resolve_cb),
         next_req_id_(0),
         user_data_(nullptr) {
     array_buffer_allocator_ = v8::ArrayBuffer::Allocator::NewDefaultAllocator();
@@ -39,6 +40,9 @@ class DenoIsolate {
   }
 
   void AddIsolate(v8::Isolate* isolate);
+  void RegisterModule(const char* filename, v8::Local<v8::Module> module);
+  void ResolveOk(const char* filename, const char* source);
+  void ClearModules();
 
   v8::Isolate* isolate_;
   v8::ArrayBuffer::Allocator* array_buffer_allocator_;
@@ -47,8 +51,16 @@ class DenoIsolate {
   v8::SnapshotCreator* snapshot_creator_;
   void* global_import_buf_ptr_;
   deno_recv_cb recv_cb_;
+  deno_resolve_cb resolve_cb_;
   int32_t next_req_id_;
   void* user_data_;
+
+  // identity hash -> filename
+  std::map<int, std::string> module_filename_map_;
+  // filename -> Module
+  std::map<std::string, v8::Persistent<v8::Module>> module_map_;
+  // Set by deno_resolve_ok
+  v8::Persistent<v8::Module> resolve_module_;
 
   v8::Persistent<v8::Context> context_;
   std::map<int32_t, v8::Persistent<v8::Value>> async_data_map_;
@@ -84,6 +96,12 @@ class UserDataScope {
 struct InternalFieldData {
   uint32_t data;
 };
+
+static inline v8::Local<v8::String> v8_str(const char* x) {
+  return v8::String::NewFromUtf8(v8::Isolate::GetCurrent(), x,
+                                 v8::NewStringType::kNormal)
+      .ToLocalChecked();
+}
 
 void Print(const v8::FunctionCallbackInfo<v8::Value>& args);
 void Recv(const v8::FunctionCallbackInfo<v8::Value>& args);

@@ -25,6 +25,16 @@ typedef struct deno_s Deno;
 typedef void (*deno_recv_cb)(void* user_data, int32_t req_id,
                              deno_buf control_buf, deno_buf data_buf);
 
+// A callback to implement ES Module imports. User must call deno_resolve_ok()
+// at most once during deno_resolve_cb. If deno_resolve_ok() is not called, the
+// specifier is considered invalid and will issue an error in JS. The reason
+// deno_resolve_cb does not return deno_module is to avoid heap unnecessary
+// allocations.
+typedef void (*deno_resolve_cb)(void* user_data, const char* specifier,
+                                const char* referrer);
+
+void deno_resolve_ok(Deno* d, const char* filename, const char* source);
+
 void deno_init();
 const char* deno_v8_version();
 void deno_set_v8_flags(int* argc, char** argv);
@@ -32,6 +42,7 @@ void deno_set_v8_flags(int* argc, char** argv);
 typedef struct {
   deno_buf shared;       // Shared buffer to be mapped to libdeno.shared
   deno_recv_cb recv_cb;  // Maps to libdeno.send() calls.
+  deno_resolve_cb resolve_cb;
 } deno_config;
 
 Deno* deno_new(deno_buf snapshot, deno_config config);

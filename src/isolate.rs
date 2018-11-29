@@ -146,6 +146,7 @@ impl Isolate {
     let config = libdeno::deno_config {
       shared: libdeno::deno_buf::empty(), // TODO Use for message passing.
       recv_cb: pre_dispatch,
+      resolve_cb: module_resolve,
     };
     let libdeno_isolate = unsafe { libdeno::deno_new(snapshot, config) };
     // This channel handles sending async messages back to the runtime.
@@ -304,6 +305,33 @@ impl Drop for Isolate {
   fn drop(&mut self) {
     unsafe { libdeno::deno_delete(self.libdeno_isolate) }
   }
+}
+
+use libc::c_char;
+
+// Is the extern "C" necessary ?
+extern "C" fn module_resolve(
+  user_data: *mut c_void,
+  specifier_ptr: *const c_char,
+  referrer_ptr: *const c_char,
+) {
+  let specifier_c: &CStr = unsafe { CStr::from_ptr(specifier_ptr) };
+  let specifier: &str = specifier_c.to_str().unwrap();
+
+  let referrer_c: &CStr = unsafe { CStr::from_ptr(referrer_ptr) };
+  let referrer: &str = referrer_c.to_str().unwrap();
+
+  debug!("rust resolve callback {}, {}", specifier, referrer);
+  let isolate = Isolate::from_void_ptr(user_data);
+
+  let out = isolate.state.dir.code_fetch(specifier, referrer).unwrap();
+  debug!("rust resolve out {}", out.filename);
+  let filename = out.filename.as_ptr() as *const i8;
+  let source = out.source_code.as_ptr() as *const i8;
+
+  unsafe {
+    libdeno::deno_resolve_ok(isolate.libdeno_isolate, filename, source)
+  };
 }
 
 // Dereferences the C pointer into the Rust Isolate object.

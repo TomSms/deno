@@ -127,6 +127,17 @@ rust_executable("deno") {
   ]
 }
 
+# No TypeScript version of deno. ES modules only.
+rust_executable("deno2") {
+  source_root = "src/main.rs"
+  extern = main_extern
+  features = [ "deno2" ]
+  deps = [
+    ":deno_deps",
+    ":snapshot_deno2",
+  ]
+}
+
 rust_test("test_rs") {
   source_root = "src/main.rs"
   extern = main_extern
@@ -197,6 +208,31 @@ run_node("bundle") {
   ]
 }
 
+run_node("bundle2") {
+  out_dir = "$target_gen_dir/bundle2/"
+  outputs = [
+    out_dir + "main.js",
+    out_dir + "main.js.map",
+  ]
+  depfile = out_dir + "main.d"
+  deps = [
+    ":deno_runtime_declaration",
+    ":msg_ts",
+  ]
+  args = [
+    rebase_path("third_party/node_modules/rollup/bin/rollup", root_build_dir),
+    "-c",
+    rebase_path("rollup.config.js", root_build_dir),
+    "-i",
+    rebase_path("js/main2.ts", root_build_dir),
+    "-o",
+    rebase_path(out_dir + "main.js", root_build_dir),
+    "--sourcemapFile",
+    rebase_path("."),
+    "--silent",
+  ]
+}
+
 ts_flatbuffer("msg_ts") {
   sources = [
     "src/msg.fbs",
@@ -215,5 +251,13 @@ snapshot("snapshot_deno") {
   source_map = "$target_gen_dir/bundle/main.js.map"
   deps = [
     ":bundle",
+  ]
+}
+
+snapshot("snapshot_deno2") {
+  js = "$target_gen_dir/bundle2/main.js"
+  source_map = "$target_gen_dir/bundle2/main.js.map"
+  deps = [
+    ":bundle2",
   ]
 }

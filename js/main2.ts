@@ -6,13 +6,12 @@ import * as flatbuffers from "./flatbuffers";
 import * as msg from "gen/msg_generated";
 import { assert, log, setLogDebug } from "./util";
 import * as os from "./os";
-import { Compiler } from "./compiler";
-import { Runner } from "./runner";
 import { libdeno } from "./libdeno";
 import { args } from "./deno";
 import { sendSync, handleAsyncMsgFromRust } from "./dispatch";
-import { replLoop } from "./repl";
-import { version } from "typescript";
+import { promiseErrorExaminer, promiseRejectHandler } from "./promise_util";
+// import { replLoop } from "./repl";
+// import { version } from "typescript";
 
 function sendStart(): msg.StartRes {
   const builder = flatbuffers.createBuilder();
@@ -26,9 +25,26 @@ function sendStart(): msg.StartRes {
   return startRes;
 }
 
-/* tslint:disable-next-line:no-default-export */
-export default function denoMain() {
+function onGlobalError(
+  message: string,
+  source: string,
+  lineno: number,
+  colno: number,
+  error: any // tslint:disable-line:no-any
+) {
+  if (error instanceof Error) {
+    console.log(error.stack);
+  } else {
+    console.log(`Thrown: ${String(error)}`);
+  }
+  os.exit(1);
+}
+
+function deno2Bootstrap() {
   libdeno.recv(handleAsyncMsgFromRust);
+  libdeno.setGlobalErrorHandler(onGlobalError);
+  libdeno.setPromiseRejectHandler(promiseRejectHandler);
+  libdeno.setPromiseErrorExaminer(promiseErrorExaminer);
 
   // First we send an empty "Start" message to let the privileged side know we
   // are ready. The response should be a "StartRes" message containing the CLI
@@ -36,23 +52,6 @@ export default function denoMain() {
   const startResMsg = sendStart();
 
   setLogDebug(startResMsg.debugFlag());
-
-  const compiler = Compiler.instance();
-
-  // handle `--types`
-  if (startResMsg.typesFlag()) {
-    const defaultLibFileName = compiler.getDefaultLibFileName();
-    console.log(compiler.getSource(defaultLibFileName));
-    os.exit(0);
-  }
-
-  // handle `--version`
-  if (startResMsg.versionFlag()) {
-    console.log("deno:", startResMsg.denoVersion());
-    console.log("v8:", startResMsg.v8Version());
-    console.log("typescript:", version);
-    os.exit(0);
-  }
 
   const cwd = startResMsg.cwd();
   log("cwd", cwd);
@@ -62,18 +61,8 @@ export default function denoMain() {
   }
   log("args", args);
   Object.freeze(args);
-  const inputFn = args[0];
-
-  compiler.recompile = startResMsg.recompileFlag();
-  const runner = new Runner(compiler);
-
-  if (inputFn) {
-    runner.run(inputFn, `${cwd}/`);
-  } else {
-    replLoop();
-  }
 }
 
 // TODO(ry) denoMain needs to be accessable to src/main.rs - is there a way to do
 // this without adding it to the global scope?
-window["denoMain"] = denoMain;
+window["deno2Bootstrap"] = deno2Bootstrap;

@@ -295,7 +295,7 @@ void Send(const v8::FunctionCallbackInfo<v8::Value>& args) {
   DCHECK_EQ(d->isolate_, isolate);
 
   v8::Locker locker(d->isolate_);
-  v8::EscapableHandleScope handle_scope(isolate);
+  v8::HandleScope handle_scope(isolate);
 
   CHECK_EQ(d->current_args_, nullptr);  // libdeno.send re-entry forbidden.
   int32_t req_id = d->next_req_id_++;
@@ -355,32 +355,37 @@ void Shared(v8::Local<v8::Name> property,
 
 bool ExecuteV8StringSource(v8::Local<v8::Context> context,
                            const char* js_filename,
-                           v8::Local<v8::String> source) {
+                           v8::Local<v8::String> source_text) {
   auto* isolate = context->GetIsolate();
+
   v8::Isolate::Scope isolate_scope(isolate);
   v8::HandleScope handle_scope(isolate);
-
   v8::Context::Scope context_scope(context);
 
   v8::TryCatch try_catch(isolate);
 
-  auto name = v8_str(js_filename);
+  auto maybe_module = CompileModule(context, js_filename, source_text);
 
-  v8::ScriptOrigin origin(name);
-
-  auto script = v8::Script::Compile(context, source, &origin);
-
-  if (script.IsEmpty()) {
+  if (maybe_module.IsEmpty()) {
     DCHECK(try_catch.HasCaught());
     HandleException(context, try_catch.Exception());
     return false;
   }
 
-  auto result = script.ToLocalChecked()->Run(context);
+  auto module = maybe_module.ToLocalChecked();
+  auto maybe_ok = module->InstantiateModule(context, ResolveCallback);
+  if (maybe_ok.IsNothing()) {
+    return false;
+  }
+
+  CHECK_EQ(v8::Module::kInstantiated, module->GetStatus());
+  auto result = module->Evaluate(context);
 
   if (result.IsEmpty()) {
+    // printf("Exception while evaluating module %s\n", js_filename);
     DCHECK(try_catch.HasCaught());
-    HandleException(context, try_catch.Exception());
+    CHECK_EQ(v8::Module::kErrored, module->GetStatus());
+    HandleException(context, module->GetException());
     return false;
   }
 
@@ -435,6 +440,76 @@ void InitializeContext(v8::Isolate* isolate, v8::Local<v8::Context> context,
     CHECK(r);
   }
 }
+
+/*
+v8::MaybeLocal<v8::Promise> DynamicImportCallback(
+    v8::Local<v8::Context> context, v8::Local<v8::ScriptOrModule> referrer,
+    v8::Local<v8::String> specifier) {
+  auto* isolate = context->GetIsolate();
+  DenoIsolate* d = FromIsolate(isolate);
+
+  v8::Isolate::Scope isolate_scope(isolate);
+  v8::EscapableHandleScope handle_scope(isolate);
+  v8::Context::Scope context_scope(context);
+
+  // v8::TryCatch try_catch(isolate);
+
+  v8::String::Utf8Value specifier_(isolate, specifier);
+  const char* specifier_c = ToCString(specifier_);
+
+  const char* referrer_c = nullptr;
+  auto resource_name = referrer->GetResourceName();
+  if (resource_name->IsString()) {
+    v8::String::Utf8Value resource_name_(isolate, resource_name);
+    referrer_c = ToCString(resource_name_);
+  }
+
+  auto resolver = v8::Promise::Resolver::New(context).ToLocalChecked();
+
+  printf("DynamicImportCallback %s %s\n", specifier_c, referrer_c);
+
+  // TODO The follow code is copy&pasted from ResolveCallback. Need to dedup.
+  // TODO resolve_cb_ is synchronous! dynamic import is not!
+
+  CHECK_NE(d->resolve_cb_, nullptr);
+  deno_module m = d->resolve_cb_(d->user_data_, specifier_c, referrer_c);
+
+  if (m.filename == nullptr) {
+    // Resolution Error.
+    CHECK_EQ(m.source, nullptr);
+    printf("ResolveCallback resolution error\n");
+    CHECK(resolver->Reject(context, v8::Undefined(isolate)).ToChecked());
+  } else {
+    auto count = d->module_map_.count(m.filename);
+    if (count == 1) {
+      printf("ResolveCallback found existing %s\n", m.filename);
+      auto submodule = d->module_map_[m.filename].Get(d->isolate_);
+      auto ns = submodule->GetModuleNamespace();
+      CHECK(resolver->Resolve(context, ns).ToChecked());
+    } else {
+      CHECK_EQ(count, 0);
+      printf("ResolveCallback newly compiled submodule %s\n", m.filename);
+      v8::TryCatch try_catch(isolate);
+
+      auto maybe_submodule =
+          CompileModule(context, m.filename, v8_str(m.source));
+
+      if (maybe_submodule.IsEmpty()) {
+        DCHECK(try_catch.HasCaught());
+        HandleException(context, try_catch.Exception());
+        printf("Error InstantiateModule %s\n", d->last_exception_.c_str());
+      } else {
+        auto submodule = maybe_submodule.ToLocalChecked();
+        auto ns = submodule->GetModuleNamespace();
+        CHECK(resolver->Resolve(context, ns).ToChecked());
+      }
+
+    }
+  }
+
+  return handle_scope.Escape(resolver->GetPromise());
+}
+*/
 
 void DenoIsolate::AddIsolate(v8::Isolate* isolate) {
   isolate_ = isolate;
