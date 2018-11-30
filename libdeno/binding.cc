@@ -427,6 +427,11 @@ void InitializeContext(v8::Isolate* isolate, v8::Local<v8::Context> context,
     auto source = deno::v8_str(js_source);
 
     bool r = deno::ExecuteV8StringSource(context, js_filename, source);
+    if (!r) {
+      DenoIsolate* d = FromIsolate(isolate);
+      std::cerr << "Pre-Deno Exception " << d->last_exception_ << std::endl;
+      exit(1);
+    }
     CHECK(r);
   }
 }
