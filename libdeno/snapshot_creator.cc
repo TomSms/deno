@@ -29,7 +29,7 @@ int main(int argc, char** argv) {
   }
 
   deno_init();
-  deno_config config = {deno::empty_buf, nullptr};
+  deno_config config = {deno::empty_buf, nullptr, nullptr};
   Deno* d = deno_new_snapshotter(config, js_fn, js_source.c_str());
 
   auto snapshot = deno_get_snapshot(d);

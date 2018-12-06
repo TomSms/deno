@@ -5,11 +5,9 @@ import { window } from "./globals";
 import * as flatbuffers from "./flatbuffers";
 import * as msg from "gen/msg_generated";
 import { assert, log, setLogDebug } from "./util";
-import * as os from "./os";
 import { libdeno } from "./libdeno";
 import { args } from "./deno";
 import { sendSync, handleAsyncMsgFromRust } from "./dispatch";
-import { promiseErrorExaminer, promiseRejectHandler } from "./promise_util";
 // import { replLoop } from "./repl";
 // import { version } from "typescript";
 
@@ -25,26 +23,8 @@ function sendStart(): msg.StartRes {
   return startRes;
 }
 
-function onGlobalError(
-  message: string,
-  source: string,
-  lineno: number,
-  colno: number,
-  error: any // tslint:disable-line:no-any
-) {
-  if (error instanceof Error) {
-    console.log(error.stack);
-  } else {
-    console.log(`Thrown: ${String(error)}`);
-  }
-  os.exit(1);
-}
-
 function deno2Bootstrap() {
   libdeno.recv(handleAsyncMsgFromRust);
-  libdeno.setGlobalErrorHandler(onGlobalError);
-  libdeno.setPromiseRejectHandler(promiseRejectHandler);
-  libdeno.setPromiseErrorExaminer(promiseErrorExaminer);
 
   // First we send an empty "Start" message to let the privileged side know we
   // are ready. The response should be a "StartRes" message containing the CLI

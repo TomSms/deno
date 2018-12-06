@@ -19,14 +19,14 @@ TEST(LibDenoTest, InitializesCorrectlyWithoutSnapshot) {
 }
 
 TEST(LibDenoTest, SnapshotterInitializesCorrectly) {
-  Deno* d =
-      deno_new_snapshotter(deno_config{empty, nullptr}, "a.js", "a = 1 + 2");
+  Deno* d = deno_new_snapshotter(deno_config{empty, nullptr, nullptr}, "a.js",
+                                 "1 + 2");
   deno_delete(d);
 }
 
 TEST(LibDenoTest, Snapshotter) {
-  Deno* d1 =
-      deno_new_snapshotter(deno_config{empty, nullptr}, "a.js", "a = 1 + 2");
+  Deno* d1 = deno_new_snapshotter(deno_config{empty, nullptr, nullptr}, "a.js",
+                                  SET_GLOBAL "global.a = 1 + 2");
   deno_buf test_snapshot = deno_get_snapshot(d1);
   deno_delete(d1);
 
@@ -227,7 +227,7 @@ TEST(LibDenoTest, DataBuf) {
 TEST(LibDenoTest, CheckPromiseErrors) {
   static int count = 0;
   auto recv_cb = [](auto _, int req_id, auto buf, auto data_buf) { count++; };
-  Deno* d = deno_new(snapshot, deno_config{empty, recv_cb});
+  Deno* d = deno_new(snapshot, deno_config{empty, recv_cb, nullptr});
   EXPECT_EQ(deno_last_exception(d), nullptr);
   EXPECT_TRUE(deno_execute(d, nullptr, "a.js", "CheckPromiseErrors()"));
   EXPECT_EQ(deno_last_exception(d), nullptr);
@@ -240,7 +240,7 @@ TEST(LibDenoTest, CheckPromiseErrors) {
 }
 
 TEST(LibDenoTest, LastException) {
-  Deno* d = deno_new(empty, deno_config{empty, nullptr});
+  Deno* d = deno_new(empty, deno_config{empty, nullptr, nullptr});
   EXPECT_EQ(deno_last_exception(d), nullptr);
   EXPECT_FALSE(deno_execute(d, nullptr, "a.js", "\n\nthrow Error('boo');\n\n"));
   EXPECT_STREQ(deno_last_exception(d),

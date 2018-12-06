@@ -322,7 +322,7 @@ extern "C" fn module_resolve(
   let referrer: &str = referrer_c.to_str().unwrap();
 
   debug!("rust resolve callback {}, {}", specifier, referrer);
-  let isolate = Isolate::from_void_ptr(user_data);
+  let isolate = unsafe { Isolate::from_raw_ptr(user_data) };
 
   let out = isolate.state.dir.code_fetch(specifier, referrer).unwrap();
   debug!("rust resolve out {}", out.filename);
