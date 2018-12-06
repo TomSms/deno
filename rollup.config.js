@@ -210,6 +210,28 @@ function writeDepFile({ outputFile, sourceFiles, configFiles, timestamp }) {
   }
 }
 
+let inliningPlugin;
+let extraExcludes;
+if (process.env.DENO2) {
+  inliningPlugin = strings({
+    include: [
+      "*.d.ts",
+      `${__dirname}/**/*.d.ts`,
+      `${process.cwd()}/**/*.d.ts`
+    ]
+  });
+  extraExcludes = [ "compiler.ts", "assets.ts" ];
+} else {
+  inliningPlugin = strings({
+    include: [
+      "*.d.ts",
+      `${__dirname}/**/*.d.ts`,
+      `${process.cwd()}/**/*.d.ts`
+    ]
+  });
+  extraExcludes = [];
+}
+
 export default function makeConfig(commandOptions) {
   return {
     output: {
@@ -239,13 +261,7 @@ export default function makeConfig(commandOptions) {
       }),
 
       // Provides inlining of file contents for `js/assets.ts`
-      strings({
-        include: [
-          "*.d.ts",
-          `${__dirname}/**/*.d.ts`,
-          `${process.cwd()}/**/*.d.ts`
-        ]
-      }),
+      inliningPlugin,
 
       // Resolves any resources that have been generated at build time
       resolveGenerated(),
@@ -294,7 +310,7 @@ export default function makeConfig(commandOptions) {
           "*.d.ts",
           `${__dirname}/**/*.d.ts`,
           `${process.cwd()}/**/*.d.ts`
-        ]
+        ] + extraExcludes
       }),
 
       // Provide some concise information about the bundle

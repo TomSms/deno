@@ -78,6 +78,47 @@ fn print_err_and_exit(err: js_errors::JSError) {
   std::process::exit(1);
 }
 
+#[cfg(feature = "deno2")]
+fn main2(state: Arc<isolate::IsolateState>) {
+  let snapshot = snapshot::deno_snapshot2();
+
+  let state2 = state.clone();
+
+  let isolate = isolate::Isolate::new(snapshot, state, ops::dispatch);
+  tokio_util::init(|| {
+    isolate
+      .execute("main2.js", "deno2Bootstrap()")
+			.unwrap_or_else(print_err_and_exit);
+
+    if state2.argv.len() > 1 {
+      let cwd_path = std::env::current_dir().unwrap();
+      let cwd = fs::normalize_path(cwd_path.as_ref()) + "/";
+      let cwd = cwd.as_ref();
+
+      let out = state2.dir.code_fetch(&state2.argv[1], &cwd).unwrap();
+      println!("fetching input {}", out.filename);
+
+      isolate
+        .execute(&out.filename, &out.source_code)
+      	.unwrap_or_else(print_err_and_exit);
+    }
+
+    isolate.event_loop().unwrap_or_else(print_err_and_exit);
+  });
+}
+
+#[cfg(not(feature = "deno2"))]
+fn main1(state: Arc<isolate::IsolateState>) {
+  let snapshot = snapshot::deno_snapshot();
+  let isolate = isolate::Isolate::new(snapshot, state, ops::dispatch);
+  tokio_util::init(|| {
+    isolate
+      .execute("deno_main.js", "denoMain();")
+      .unwrap_or_else(print_err_and_exit);
+    isolate.event_loop().unwrap_or_else(print_err_and_exit);
+  });
+}
+
 fn main() {
   // Rust does not die on panic by default. And -Cpanic=abort is broken.
   // https://github.com/rust-lang/cargo/issues/2738
@@ -107,12 +148,9 @@ fn main() {
   });
 
   let state = Arc::new(isolate::IsolateState::new(flags, rest_argv));
-  let snapshot = snapshot::deno_snapshot();
-  let isolate = isolate::Isolate::new(snapshot, state, ops::dispatch);
-  tokio_util::init(|| {
-    isolate
-      .execute("deno_main.js", "denoMain();")
-      .unwrap_or_else(print_err_and_exit);
-    isolate.event_loop().unwrap_or_else(print_err_and_exit);
-  });
+
+	#[cfg(feature = "deno2")]
+	main2(state);
+	#[cfg(not(feature = "deno2"))]
+	main1(state);
 }

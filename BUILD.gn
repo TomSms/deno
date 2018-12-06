@@ -230,6 +230,8 @@ run_node("bundle2") {
     "--sourcemapFile",
     rebase_path("."),
     "--silent",
+    "--environment",
+    "DENO2",
   ]
 }
 

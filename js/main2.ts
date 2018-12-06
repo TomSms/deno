@@ -9,7 +9,6 @@ import { libdeno } from "./libdeno";
 import { args } from "./deno";
 import { sendSync, handleAsyncMsgFromRust } from "./dispatch";
 // import { replLoop } from "./repl";
-// import { version } from "typescript";
 
 function sendStart(): msg.StartRes {
   const builder = flatbuffers.createBuilder();
