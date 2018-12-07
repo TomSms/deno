@@ -203,6 +203,27 @@ impl DenoDir {
     use_extension(".js")
   }
 
+  // Same as code_fetch but also compiles TS.
+  pub fn code_fetch_compile(
+    self: &Self,
+    module_specifier: &str,
+    containing_file: &str,
+  ) -> Result<CodeFetchOutput, errors::DenoError> {
+    let mut out = self.code_fetch(module_specifier, containing_file)?;
+    if out.maybe_output_code.is_none() {
+      println!("COMPILE");
+      match compiler.compile(out) {
+        Err(js_error) => {
+          panic!(js_error);
+        },
+        Ok(out) => {
+          return Ok(out);
+        },
+      }
+    }
+    Ok(out)
+  }
+
   pub fn code_fetch(
     self: &Self,
     module_specifier: &str,

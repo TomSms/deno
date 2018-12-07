@@ -109,6 +109,7 @@ const char* deno_last_exception(Deno* d_) {
 
 int deno_execute(Deno* d_, void* user_data, const char* js_filename,
                  const char* js_source) {
+  printf("deno_execute %s\n######\n%s\n######\n", js_filename, js_source);
   auto* d = unwrap(d_);
   deno::UserDataScope user_data_scope(d, user_data);
   auto* isolate = d->isolate_;

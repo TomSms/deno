@@ -214,7 +214,9 @@ impl Isolate {
       )
     };
     if r == 0 {
+      println!("deno_execute returned 0");
       let js_error = self.last_exception().unwrap();
+      println!("after last_exception");
       return Err(js_error);
     }
     Ok(())
@@ -321,16 +323,22 @@ extern "C" fn module_resolve(
   let referrer_c: &CStr = unsafe { CStr::from_ptr(referrer_ptr) };
   let referrer: &str = referrer_c.to_str().unwrap();
 
-  debug!("rust resolve callback {}, {}", specifier, referrer);
+  debug!("module_resolve callback {} {}", specifier, referrer);
   let isolate = unsafe { Isolate::from_raw_ptr(user_data) };
 
-  let out = isolate.state.dir.code_fetch(specifier, referrer).unwrap();
-  debug!("rust resolve out {}", out.filename);
+  let out = isolate.state.dir.code_fetch_compile(specifier, referrer).unwrap();
+  debug!("module_resolve complete {}", out.filename);
   let filename = out.filename.as_ptr() as *const i8;
-  let source = out.source_code.as_ptr() as *const i8;
+
+  let js_source = match out.maybe_output_code {
+    None => out.source_code,
+    Some(output_code) => output_code,
+  };
+  debug!("js_source\n{}\n#####", js_source);
+  let js_source_ptr = js_source.as_ptr() as *const i8;
 
   unsafe {
-    libdeno::deno_resolve_ok(isolate.libdeno_isolate, filename, source)
+    libdeno::deno_resolve_ok(isolate.libdeno_isolate, filename, js_source_ptr)
   };
 }
 

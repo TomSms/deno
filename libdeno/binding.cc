@@ -384,6 +384,7 @@ void DenoIsolate::RegisterModule(const char* filename,
 v8::MaybeLocal<v8::Module> CompileModule(v8::Local<v8::Context> context,
                                          const char* js_filename,
                                          v8::Local<v8::String> source_text) {
+  printf("CompileModule %s\n", js_filename);
   auto* isolate = context->GetIsolate();
 
   v8::Isolate::Scope isolate_scope(isolate);
@@ -431,7 +432,8 @@ v8::MaybeLocal<v8::Module> ResolveCallback(v8::Local<v8::Context> context,
     return v8::MaybeLocal<v8::Module>();
   } else {
     auto module = d->resolve_module_.Get(isolate);
-    d->resolve_module_.Reset();
+    CHECK(!module.IsEmpty());
+    //d->resolve_module_.Reset();
     return handle_scope.Escape(module);
   }
 }
@@ -447,6 +449,7 @@ void DenoIsolate::ResolveOk(const char* filename, const char* source) {
     v8::HandleScope handle_scope(isolate_);
     auto context = context_.Get(isolate_);
     v8::TryCatch try_catch(isolate_);
+
     auto maybe_module = CompileModule(context, filename, v8_str(source));
     if (maybe_module.IsEmpty()) {
       DCHECK(try_catch.HasCaught());
@@ -478,6 +481,7 @@ bool ExecuteV8StringSource(v8::Local<v8::Context> context,
     return false;
   }
 
+  printf("InstantiateModule %s\n", js_filename);
   auto module = maybe_module.ToLocalChecked();
   auto maybe_ok = module->InstantiateModule(context, ResolveCallback);
   if (maybe_ok.IsNothing()) {

@@ -141,7 +141,7 @@ export class Compiler
   private readonly _options: ts.CompilerOptions = {
     allowJs: true,
     checkJs: true,
-    module: ts.ModuleKind.AMD,
+    module: ts.ModuleKind.ESNext,
     outDir: "$deno$",
     resolveJsonModule: true,
     sourceMap: true,

@@ -186,7 +186,7 @@ TEST(LibDenoTest, SnapshotBug) {
 }
 
 TEST(LibDenoTest, GlobalErrorHandling) {
-  Deno* d = deno_new(snapshot, deno_config{empty, nullptr});
+  Deno* d = deno_new(snapshot, deno_config{empty, nullptr, nullptr});
   EXPECT_FALSE(deno_execute(d, nullptr, "a.js", "GlobalErrorHandling()"));
   // We only check that it starts with this string, so we don't have to check
   // the second frame, which contains line numbers in libdeno_test.js and may

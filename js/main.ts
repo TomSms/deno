@@ -74,6 +74,47 @@ export default function denoMain() {
   }
 }
 
+async function compilerMain() {
+  libdeno.recv(handleAsyncMsgFromRust);
+
+  // First we send an empty "Start" message to let the privileged side know we
+  // are ready. The response should be a "StartRes" message containing the CLI
+  // args and other info.
+  const startResMsg = sendStart();
+
+  setLogDebug(startResMsg.debugFlag());
+
+  const compiler = Compiler.instance();
+
+  // handle `--types`
+  if (startResMsg.typesFlag()) {
+    const defaultLibFileName = compiler.getDefaultLibFileName();
+    console.log(compiler.getSource(defaultLibFileName));
+    os.exit(0);
+  }
+
+  // handle `--version`
+  if (startResMsg.versionFlag()) {
+    console.log("deno:", startResMsg.denoVersion());
+    console.log("v8:", startResMsg.v8Version());
+    console.log("typescript:", version);
+    os.exit(0);
+  }
+
+  compiler.recompile = startResMsg.recompileFlag();
+  const runner = new Runner(compiler);
+
+  // WebWorker style.
+  window["onmessage"] = (e) => {
+    let info = e.data as CodeInfo;
+    // Sync - so FIFO.
+    let outputCode = compiler.getOutput(info);
+    // What about compile errors?
+    postMessage(outputCode);
+  };
+}
+
 // TODO(ry) denoMain needs to be accessable to src/main.rs - is there a way to do
 // this without adding it to the global scope?
 window["denoMain"] = denoMain;
+window["compilerMain"] = compilerMain;
